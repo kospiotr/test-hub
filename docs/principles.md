@@ -1,0 +1,1 @@
+- When creating CRUD screens the create and edit panels should look the same, they should reuse the same component and logic like validation etc.
