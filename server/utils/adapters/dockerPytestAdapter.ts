@@ -5,11 +5,12 @@ import { db } from '../db'
 import { testPacks, tests } from '../../db/schema'
 import { runImageCommand } from '../docker-runner'
 import {
-  type AdapterConfigField,
   AdapterInstance,
   type AdapterOperationDefinition,
   type AdapterStateSupplier,
-  type AdapterJobOperationContext
+  type AdapterJobOperationContext,
+  type AdapterValidationCheckResult,
+  type AdapterValidationContext
 } from './core'
 
 type DockerPytestConfig = {
@@ -23,22 +24,19 @@ export class DockerPytestAdapter extends AdapterInstance<DockerPytestConfig> {
   readonly label = 'Docker Pytest'
   readonly description = 'Collect tests from a docker image using pytest --collect-only.'
 
-  readonly configFields: AdapterConfigField[] = [
-    {
-      key: 'imageRegistry',
-      label: 'Image Registry',
-      type: 'text',
-      placeholder: 'registry.hub.docker.com',
-      required: true
-    },
-    {key: 'imageName', label: 'Image Name', type: 'text', placeholder: 'org/qa-runner', required: true},
-    {key: 'imageVersion', label: 'Image Version', type: 'text', placeholder: 'latest', required: true}
-  ]
-
   readonly configSchema = z.object({
-    imageRegistry: z.string().trim().min(1).max(200),
-    imageName: z.string().trim().min(1).max(200),
-    imageVersion: z.string().trim().min(1).max(120)
+    imageRegistry: z.string().trim().min(1).max(200).meta({
+      label: 'Image Registry',
+      placeholder: 'registry.hub.docker.com'
+    }),
+    imageName: z.string().trim().min(1).max(200).meta({
+      label: 'Image Name',
+      placeholder: 'org/qa-runner'
+    }),
+    imageVersion: z.string().trim().min(1).max(120).meta({
+      label: 'Image Version',
+      placeholder: 'latest'
+    })
   })
 
   private imageRef(config: DockerPytestConfig) {
@@ -101,30 +99,6 @@ export class DockerPytestAdapter extends AdapterInstance<DockerPytestConfig> {
   ]
 
   readonly states: AdapterStateSupplier[] = [
-    {
-      key: 'imageStatus',
-      label: 'Image Status',
-      supply: async (context) => {
-        const resolved = await this.resolveContext(context.testPackId)
-        const imageRef = this.imageRef(resolved.config)
-        const pulled = await hasLocalImage(imageRef)
-        return pulled ? 'pulled' : 'missing'
-      }
-    },
-    {
-      key: 'testsCount',
-      label: 'Tests Count',
-      supply: async (context) => {
-        const resolved = await this.resolveContext(context.testPackId)
-        const rows = await db.select({ id: tests.id }).from(tests)
-          .where(and(
-            eq(tests.testPackId, resolved.testPack.id),
-            eq(tests.imageVersion, resolved.config.imageVersion)
-          ))
-
-        return String(rows.length)
-      }
-    }
   ]
 
   async runLoadTests(testPackId: number, appendLog: (message: string) => Promise<void>) {
@@ -142,7 +116,7 @@ export class DockerPytestAdapter extends AdapterInstance<DockerPytestConfig> {
     }
 
     await appendLog('Running pytest collect command in container.')
-    const result = await runImageCommand(imageRef, ['pytest', '--collect-only', '-q'])
+    const result = await runImageCommand(imageRef, ['pytest', '--collect-only'])
     const stdoutTail = tailText(result.stdout)
     const stderrTail = tailText(result.stderr)
     await appendLog(`imageCommand stdout tail:\n${stdoutTail || '<empty>'}`)
@@ -212,6 +186,18 @@ export class DockerPytestAdapter extends AdapterInstance<DockerPytestConfig> {
     if (loadTestsOp) {
       loadTestsOp.runInJob = async (context) => await this.runLoadTestsInJob(context)
     }
+  }
+
+  async runValidationChecks(context: AdapterValidationContext): Promise<AdapterValidationCheckResult[]> {
+    const resolved = await this.resolveContext(context.testPackId)
+    const imageRef = this.imageRef(resolved.config)
+    const existsLocally = await hasLocalImage(imageRef)
+
+    return [{
+      key: 'docker-image-exists',
+      description: `Docker image exists locally (${imageRef})`,
+      status: existsLocally ? 'ok' : 'error'
+    }]
   }
 }
 

@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import type { TableColumn } from '@nuxt/ui'
-import { upperFirst } from 'scule'
-import { getPaginationRowModel } from '@tanstack/table-core'
-import type { Row } from '@tanstack/table-core'
-import type { TestPack } from '~/types'
+import type {TableColumn} from '@nuxt/ui'
+import {upperFirst} from 'scule'
+import {getPaginationRowModel} from '@tanstack/table-core'
+import type {Row} from '@tanstack/table-core'
+import type {TestPack} from '~/types'
 
 const UButton = resolveComponent('UButton')
 const UBadge = resolveComponent('UBadge')
@@ -22,7 +22,7 @@ const columnVisibility = ref({
 })
 const rowSelection = ref<Record<number, boolean>>({})
 
-const { data, status, refresh } = await useFetch<TestPack[]>('/api/test-packs', {
+const {data, status, refresh} = await useFetch<TestPack[]>('/api/test-packs', {
   lazy: true,
   default: () => []
 })
@@ -32,8 +32,8 @@ function goToCreatePage() {
 }
 
 async function deleteOne(pack: TestPack) {
-  await $fetch(`/api/test-packs/${pack.id}`, { method: 'DELETE' })
-  toast.add({ title: 'Deleted', description: `${pack.name} removed.`, color: 'success' })
+  await $fetch(`/api/test-packs/${pack.id}`, {method: 'DELETE'})
+  toast.add({title: 'Deleted', description: `${pack.name} removed.`, color: 'success'})
   await refresh()
 }
 
@@ -43,18 +43,88 @@ async function deleteSelected() {
   }
 
   const selectedIds = table.value.tableApi.getFilteredSelectedRowModel().rows.map(row => row.original.id)
-  await Promise.all(selectedIds.map(id => $fetch(`/api/test-packs/${id}`, { method: 'DELETE' })))
+  await Promise.all(selectedIds.map(id => $fetch(`/api/test-packs/${id}`, {method: 'DELETE'})))
   rowSelection.value = {}
-  toast.add({ title: 'Deleted', description: `${selectedIds.length} test pack(s) removed.`, color: 'success' })
+  toast.add({title: 'Deleted', description: `${selectedIds.length} test pack(s) removed.`, color: 'success'})
   await refresh()
 }
 
-function stateValue(pack: TestPack, key: string) {
-  return pack.state.states.find(item => item.key === key)?.value || '-'
+function onRowSelect(event: Event, row: Row<TestPack>) {
+  const target = event?.target as HTMLElement | null
+  if (target?.closest('button, a, input, [role="menuitem"], [role="checkbox"]')) {
+    return
+  }
+
+  void navigateTo(`/test-packs/${row.original.id}/read`)
+}
+
+function adapterStatusValue(pack: TestPack) {
+  const states = pack.state.states || []
+  const direct = states.find(item => item.key === 'status' || item.key === 'adapterStatus')
+  if (direct) {
+    return direct.value
+  }
+
+  const suffix = states.find(item => /status$/i.test(item.key))
+  if (suffix) {
+    return suffix.value
+  }
+
+  const fallback = states.find(item => item.key !== 'testsCount')
+  return fallback?.value || '-'
+}
+
+function adapterStatusColor(value: string) {
+  const normalized = value.toLowerCase()
+  if (['ok', 'healthy', 'ready', 'pulled', 'available', 'online', 'connected'].includes(normalized)) {
+    return 'success' as const
+  }
+
+  if (['warning', 'degraded', 'pending', 'queued', 'running'].includes(normalized)) {
+    return 'warning' as const
+  }
+
+  if (['error', 'failed', 'invalid-config', 'missing', 'offline', 'disconnected'].includes(normalized)) {
+    return 'error' as const
+  }
+
+  return 'neutral' as const
 }
 
 function getRowItems(row: Row<TestPack>) {
-  const operationIds = new Set((row.original.operations || []).map(op => op.id))
+  const operationItems = (row.original.operations || [])
+    .filter(operation => operation.scope === 'test-pack')
+    .map((operation) => {
+      const icon = {
+        'pull-image': 'i-lucide-download',
+        'load-tests': 'i-lucide-list-checks'
+      }[operation.id] || 'i-lucide-play'
+
+      return {
+        label: operation.label,
+        icon,
+        async onSelect() {
+          const result = await $fetch<{
+            jobId?: number
+            message?: string
+          }>(`/api/test-packs/${row.original.id}/operations/${operation.id}`, { method: 'POST' })
+
+          toast.add({
+            title: operation.label,
+            description: result.message || `Operation ${operation.label} executed.`,
+            color: 'success'
+          })
+
+          await navigateTo({
+            path: `/test-packs/${row.original.id}/read`,
+            query: {
+              tab: 'operations',
+              operationId: operation.id
+            }
+          })
+        }
+      }
+    })
 
   return [
     {
@@ -79,28 +149,17 @@ function getRowItems(row: Row<TestPack>) {
       label: 'Edit test pack',
       icon: 'i-lucide-pencil',
       onSelect() {
-        navigateTo(`/test-packs/${row.original.id}`)
+        navigateTo(`/test-packs/${row.original.id}/edit`)
       }
     },
     {
-      label: 'Pull Image',
-      icon: 'i-lucide-download',
-      disabled: !operationIds.has('pull-image'),
-      async onSelect() {
-        await $fetch(`/api/test-packs/${row.original.id}/operations/pull-image`, { method: 'POST' })
-        toast.add({ title: 'Image pulled', description: `${row.original.name} image pulled.`, color: 'success' })
-        await refresh()
+      label: 'View test pack',
+      icon: 'i-lucide-eye',
+      onSelect() {
+        navigateTo(`/test-packs/${row.original.id}/read`)
       }
     },
-    {
-      label: 'Load Tests',
-      icon: 'i-lucide-list-checks',
-      disabled: !operationIds.has('load-tests'),
-      async onSelect() {
-        const result = await $fetch<{ jobId?: number }>(`/api/test-packs/${row.original.id}/operations/load-tests`, { method: 'POST' })
-        toast.add({ title: 'Job queued', description: `Load tests job #${result.jobId ?? '-'} queued.`, color: 'success' })
-      }
-    },
+    ...(operationItems.length ? [{ type: 'separator' as const }, ...operationItems] : []),
     {
       label: 'Delete test pack',
       icon: 'i-lucide-trash',
@@ -115,13 +174,13 @@ function getRowItems(row: Row<TestPack>) {
 const columns: TableColumn<TestPack>[] = [
   {
     id: 'select',
-    header: ({ table }) =>
+    header: ({table}) =>
       h(UCheckbox, {
         modelValue: table.getIsSomePageRowsSelected() ? 'indeterminate' : table.getIsAllPageRowsSelected(),
         'onUpdate:modelValue': (value: boolean | 'indeterminate') => table.toggleAllPageRowsSelected(!!value),
         ariaLabel: 'Select all'
       }),
-    cell: ({ row }) =>
+    cell: ({row}) =>
       h(UCheckbox, {
         modelValue: row.getIsSelected(),
         'onUpdate:modelValue': (value: boolean | 'indeterminate') => row.toggleSelected(!!value),
@@ -135,14 +194,14 @@ const columns: TableColumn<TestPack>[] = [
   {
     accessorKey: 'name',
     header: 'Name',
-    cell: ({ row }) => h('div', { class: 'font-medium text-highlighted' }, row.original.name)
+    cell: ({row}) => h('div', {class: 'font-medium text-highlighted'}, row.original.name)
   },
   {
     accessorKey: 'labels',
     header: 'Labels',
-    cell: ({ row }) => {
-      return h('div', { class: 'flex flex-wrap gap-1' }, row.original.labels.map(label =>
-        h(UBadge, { variant: 'subtle', color: 'neutral' }, () => label)
+    cell: ({row}) => {
+      return h('div', {class: 'flex flex-wrap gap-1'}, row.original.labels.map(label =>
+        h(UBadge, {variant: 'subtle', color: 'neutral'}, () => label)
       ))
     }
   },
@@ -151,22 +210,22 @@ const columns: TableColumn<TestPack>[] = [
     header: 'Adapter'
   },
   {
-    id: 'imageStatus',
-    header: 'Image Status',
-    cell: ({ row }) => {
-      const status = stateValue(row.original, 'imageStatus')
-      const color = status === 'pulled' ? 'success' : 'error'
-      return h(UBadge, { variant: 'subtle', color, class: 'capitalize' }, () => status)
+    id: 'adapterStatus',
+    header: 'Adapter Status',
+    cell: ({row}) => {
+      const status = adapterStatusValue(row.original)
+      const color = adapterStatusColor(status)
+      return h(UBadge, {variant: 'subtle', color, class: 'capitalize'}, () => status)
     }
   },
   {
     id: 'testsCount',
     header: 'Tests',
-    cell: ({ row }) => stateValue(row.original, 'testsCount')
+    cell: ({row}) => String(row.original.testsCount)
   },
   {
     accessorKey: 'updatedAt',
-    header: ({ column }) => {
+    header: ({column}) => {
       const isSorted = column.getIsSorted()
       return h(UButton, {
         color: 'neutral',
@@ -181,18 +240,18 @@ const columns: TableColumn<TestPack>[] = [
         onClick: () => column.toggleSorting(column.getIsSorted() === 'asc')
       })
     },
-    cell: ({ row }) => new Date(row.original.updatedAt).toLocaleString()
+    cell: ({row}) => new Date(row.original.updatedAt).toLocaleString()
   },
   {
     id: 'actions',
-    cell: ({ row }) => {
+    cell: ({row}) => {
       return h(
         'div',
-        { class: 'text-right' },
+        {class: 'text-right'},
         h(
           UDropdownMenu,
           {
-            content: { align: 'end' },
+            content: {align: 'end'},
             items: getRowItems(row)
           },
           () => h(UButton, {
@@ -223,37 +282,40 @@ const pagination = ref({
 </script>
 
 <template>
-  <div class="space-y-4">
-    <div class="flex flex-wrap items-center justify-between gap-1.5">
-      <UInput
-        v-model="name"
-        class="max-w-sm"
-        icon="i-lucide-search"
-        placeholder="Filter test packs..."
-      />
+  <UDashboardPanel id="customers">
+    <template #header>
+      <UDashboardNavbar title="Customers">
+        <template #leading>
+          <UDashboardSidebarCollapse/>
+        </template>
+        <template #trailing>
+          <UInput
+            v-model="name"
+            class="max-w-sm"
+            icon="i-lucide-search"
+            placeholder="Filter test packs..."
+          />
+        </template>
 
-      <div class="flex flex-wrap items-center gap-1.5">
-        <UButton label="New test pack" icon="i-lucide-plus" @click="goToCreatePage" />
+        <template #right>
 
-        <TestPacksDeleteModal
-          :count="table?.tableApi?.getFilteredSelectedRowModel().rows.length"
-          @confirm="deleteSelected"
-        >
+          <UButton label="New test pack" icon="i-lucide-plus" @click="goToCreatePage"/>
+
           <UButton
             v-if="table?.tableApi?.getFilteredSelectedRowModel().rows.length"
             label="Delete"
             color="error"
             variant="subtle"
             icon="i-lucide-trash"
+            @click="deleteSelected"
           >
             <template #trailing>
               <UKbd>{{ table?.tableApi?.getFilteredSelectedRowModel().rows.length }}</UKbd>
             </template>
           </UButton>
-        </TestPacksDeleteModal>
 
-        <UDropdownMenu
-          :items="
+          <UDropdownMenu
+            :items="
             table?.tableApi
               ?.getAllColumns()
               .filter((column: any) => column.getCanHide())
@@ -269,27 +331,33 @@ const pagination = ref({
                 }
               }))
           "
-          :content="{ align: 'end' }"
-        >
-          <UButton label="Display" color="neutral" variant="outline" trailing-icon="i-lucide-settings-2" />
-        </UDropdownMenu>
-      </div>
-    </div>
+            :content="{ align: 'end' }"
+          >
+            <UButton label="Display" color="neutral" variant="outline" trailing-icon="i-lucide-settings-2"/>
+          </UDropdownMenu>
 
-    <UTable
-      ref="table"
-      v-model:column-filters="columnFilters"
-      v-model:column-visibility="columnVisibility"
-      v-model:row-selection="rowSelection"
-      v-model:pagination="pagination"
-      :pagination-options="{
+        </template>
+      </UDashboardNavbar>
+    </template>
+    <template #body>
+
+
+
+      <UTable
+        ref="table"
+        v-model:column-filters="columnFilters"
+        v-model:column-visibility="columnVisibility"
+        v-model:row-selection="rowSelection"
+        v-model:pagination="pagination"
+        :pagination-options="{
         getPaginationRowModel: getPaginationRowModel()
       }"
-      class="shrink-0"
-      :data="data"
-      :columns="columns"
-      :loading="status === 'pending'"
-      :ui="{
+        class="shrink-0"
+        :data="data"
+        :columns="columns"
+        :loading="status === 'pending'"
+        @select="onRowSelect"
+        :ui="{
         base: 'table-fixed border-separate border-spacing-0',
         thead: '[&>tr]:bg-elevated/50 [&>tr]:after:content-none',
         tbody: '[&>tr]:last:[&>td]:border-b-0',
@@ -297,20 +365,21 @@ const pagination = ref({
         td: 'border-b border-default',
         separator: 'h-0'
       }"
-    />
-
-    <div class="flex items-center justify-between gap-3 border-t border-default pt-4 mt-auto">
-      <div class="text-sm text-muted">
-        {{ table?.tableApi?.getFilteredSelectedRowModel().rows.length || 0 }} of
-        {{ table?.tableApi?.getFilteredRowModel().rows.length || 0 }} row(s) selected.
-      </div>
-
-      <UPagination
-        :default-page="(table?.tableApi?.getState().pagination.pageIndex || 0) + 1"
-        :items-per-page="table?.tableApi?.getState().pagination.pageSize"
-        :total="table?.tableApi?.getFilteredRowModel().rows.length"
-        @update:page="(p: number) => table?.tableApi?.setPageIndex(p - 1)"
       />
-    </div>
-  </div>
+
+      <div class="flex items-center justify-between gap-3 border-t border-default pt-4 mt-auto">
+        <div class="text-sm text-muted">
+          {{ table?.tableApi?.getFilteredSelectedRowModel().rows.length || 0 }} of
+          {{ table?.tableApi?.getFilteredRowModel().rows.length || 0 }} row(s) selected.
+        </div>
+
+        <UPagination
+          :default-page="(table?.tableApi?.getState().pagination.pageIndex || 0) + 1"
+          :items-per-page="table?.tableApi?.getState().pagination.pageSize"
+          :total="table?.tableApi?.getFilteredRowModel().rows.length"
+          @update:page="(p: number) => table?.tableApi?.setPageIndex(p - 1)"
+        />
+      </div>
+    </template>
+  </UDashboardPanel>
 </template>

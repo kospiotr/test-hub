@@ -68,6 +68,11 @@ export interface TestPack {
   }>
   state: {
     adapterId: string
+    validationChecks: Array<{
+      key: string
+      description: string
+      status: 'ok' | 'error'
+    }>
     states: Array<{
       key: string
       label: string

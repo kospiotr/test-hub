@@ -58,6 +58,7 @@ export function serializeTestPackInput(input: z.output<typeof testPackBodySchema
 export async function mapTestPack(row: TestPackRow) {
   let state = {
     adapterId: row.adapterId,
+    validationChecks: [] as Array<{ key: string, description: string, status: 'ok' | 'error' }>,
     states: [] as Array<{ key: string, label: string, value: string }>
   }
 
@@ -66,8 +67,13 @@ export async function mapTestPack(row: TestPackRow) {
   } catch {
     state = {
       adapterId: row.adapterId,
+      validationChecks: [{
+        key: 'adapter-config-valid',
+        description: 'Adapter configuration is valid and state can be resolved',
+        status: 'error'
+      }],
       states: [
-        { key: 'imageStatus', label: 'Image Status', value: 'invalid-config' },
+        { key: 'adapterStatus', label: 'Adapter Status', value: 'error' },
         { key: 'testsCount', label: 'Tests Count', value: '0' }
       ]
     }

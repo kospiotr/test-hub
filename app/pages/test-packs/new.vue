@@ -18,6 +18,7 @@ const initialValue = computed<Partial<TestPack>>(() => ({
   operations: [],
   state: {
     adapterId: 'docker-pytest',
+    validationChecks: [],
     states: []
   },
   testsCount: 0
@@ -39,7 +40,7 @@ async function onSubmit(payload: {
     })
 
     toast.add({ title: 'Created', description: 'Test pack created successfully.', color: 'success' })
-    await navigateTo('/test-packs')
+    await navigateTo(`/test-packs/${created.id}/read`)
   } catch {
     toast.add({ title: 'Create failed', description: 'Please review the form and try again.', color: 'error' })
   } finally {
@@ -69,18 +70,12 @@ function saveChanges() {
             variant="ghost"
             to="/test-packs"
           />
-          <UButton
-            icon="i-lucide-save"
-            label="Create"
-            color="primary"
-            :loading="isSaving"
-            @click="saveChanges"
-          />
         </template>
       </UDashboardNavbar>
     </template>
 
     <template #body>
+      <div class="flex flex-col gap-4 sm:gap-6 lg:gap-12 w-full lg:max-w-2xl mx-auto">
       <TestPacksForm
         form-id="test-pack-create-form"
         :value="initialValue"
@@ -88,6 +83,7 @@ function saveChanges() {
         submit-label="Create"
         @submit="onSubmit"
       />
+      </div>
     </template>
   </UDashboardPanel>
 </template>

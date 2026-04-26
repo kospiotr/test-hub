@@ -7,9 +7,13 @@ import {
   type AdapterStateValue
 } from './adapters/core'
 import { DockerPytestAdapter } from './adapters/dockerPytestAdapter'
+import {LocalPytestAdapter} from "#server/utils/adapters/localPytestAdapter";
+import {ShellPytestAdapter} from "#server/utils/adapters/testAdapter";
 
 const ADAPTER_INSTANCES: AdapterInstance<Record<string, unknown>>[] = [
-  new DockerPytestAdapter() as AdapterInstance<Record<string, unknown>>
+  new DockerPytestAdapter() as AdapterInstance<Record<string, unknown>>,
+  new LocalPytestAdapter() as AdapterInstance<Record<string, unknown>>,
+  new ShellPytestAdapter() as AdapterInstance<Record<string, unknown>>
 ]
 
 function getAdapterInstanceById(id: string) {
@@ -57,7 +61,12 @@ export function assertValidAdapterConfig(adapterId: string, rawConfig: unknown) 
 export async function resolveTestPackState(testPackId: number) {
   const { adapter } = await resolveAdapterForTestPack(testPackId)
 
+  const validationChecks = await adapter.runValidationChecks({ testPackId })
+  const adapterStatus = validationChecks.every(item => item.status === 'ok') ? 'ok' : 'error'
+
   const states: AdapterStateValue[] = []
+  states.push({ key: 'adapterStatus', label: 'Adapter Status', value: adapterStatus })
+
   for (const stateDef of adapter.states) {
     const value = await stateDef.supply({ testPackId })
     states.push({ key: stateDef.key, label: stateDef.label, value })
@@ -65,6 +74,7 @@ export async function resolveTestPackState(testPackId: number) {
 
   return {
     adapterId: adapter.id,
+    validationChecks,
     states
   }
 }

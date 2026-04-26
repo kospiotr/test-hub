@@ -15,21 +15,6 @@ const links = [[{
     open.value = false
   }
 }, {
-  label: 'Inbox',
-  icon: 'i-lucide-inbox',
-  to: '/inbox',
-  badge: '4',
-  onSelect: () => {
-    open.value = false
-  }
-}, {
-  label: 'Customers',
-  icon: 'i-lucide-users',
-  to: '/customers',
-  onSelect: () => {
-    open.value = false
-  }
-}, {
   label: 'Test Packs',
   icon: 'i-lucide-flask-conical',
   to: '/test-packs',
@@ -116,13 +101,11 @@ onMounted(async () => {
     >
       <template #header="{ collapsed }">
         <UButton
-          color="neutral"
           variant="ghost"
           block
           :square="collapsed"
           class="data-[state=open]:bg-elevated"
-          :label="collapsed ? undefined : user?.name || 'QA Manager'"
-          :avatar="{ icon: 'i-lucide-shield-check' }"
+          :label="collapsed ? undefined : 'TestHUB'"
         />
       </template>
 

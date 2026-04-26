@@ -1,5 +1,5 @@
 {
-  "name": "app",
+  "name": "test-hub",
   "private": true,
   "type": "module",
   "scripts": {

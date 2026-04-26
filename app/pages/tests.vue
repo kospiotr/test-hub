@@ -2,6 +2,7 @@
 import type { TableColumn } from '@nuxt/ui'
 import { getPaginationRowModel } from '@tanstack/table-core'
 import type { TestEntity, TestExecution, TestPack } from '~/types'
+import TestListTable from '~/components/tests/TestListTable.vue'
 
 const UBadge = resolveComponent('UBadge')
 const toast = useToast()
@@ -53,25 +54,6 @@ async function runAllTests() {
   toast.add({ title: 'Job queued', description: `Load tests job #${job.jobId ?? '-'} queued.`, color: 'success' })
 }
 
-const testsColumns: TableColumn<TestEntity>[] = [{
-  accessorKey: 'id',
-  header: 'ID'
-}, {
-  accessorKey: 'name',
-  header: 'Name'
-}, {
-  accessorKey: 'path',
-  header: 'Path',
-  cell: ({ row }) => h('span', { class: 'font-mono text-xs' }, row.original.path)
-}, {
-  accessorKey: 'nodeId',
-  header: 'Node ID',
-  cell: ({ row }) => h('span', { class: 'font-mono text-xs break-all' }, row.original.nodeId)
-}, {
-  accessorKey: 'imageVersion',
-  header: 'Image Version'
-}]
-
 const executionColumns: TableColumn<TestExecution>[] = [{
   accessorKey: 'id',
   header: 'ID'
@@ -91,7 +73,6 @@ const executionColumns: TableColumn<TestExecution>[] = [{
   cell: ({ row }) => new Date(row.original.createdAt).toLocaleString()
 }]
 
-const testsPagination = ref({ pageIndex: 0, pageSize: 10 })
 const executionPagination = ref({ pageIndex: 0, pageSize: 10 })
 
 const selectedTestPackModel = computed<number | undefined>({
@@ -126,13 +107,7 @@ async function refreshData() {
 
         <div class="space-y-2">
           <h3 class="font-semibold text-highlighted">Discovered Tests</h3>
-          <UTable
-            v-model:pagination="testsPagination"
-            :pagination-options="{ getPaginationRowModel: getPaginationRowModel() }"
-            :columns="testsColumns"
-            :data="tests"
-            :loading="testsStatus === 'pending'"
-          />
+          <TestListTable :tests="tests" :loading="testsStatus === 'pending'" />
         </div>
 
         <div class="space-y-2">

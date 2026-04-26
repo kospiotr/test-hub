@@ -8,29 +8,30 @@ const toast = useToast()
 const idSchema = z.coerce.number().int().positive()
 const testPackId = idSchema.parse(route.params.id)
 
-  const { data: testPack, status, refresh } = await useFetch<TestPack>(`/api/test-packs/${testPackId}`, {
-    default: () => ({
-      id: testPackId,
-      name: '',
-      labels: [],
-      description: '',
-      documentation: '',
+const { data: testPack, status, refresh } = await useFetch<TestPack>(`/api/test-packs/${testPackId}`, {
+  default: () => ({
+    id: testPackId,
+    name: '',
+    labels: [],
+    description: '',
+    documentation: '',
+    adapterId: 'docker-pytest',
+    configuration: {
+      imageRegistry: '',
+      imageName: '',
+      imageVersion: 'latest'
+    },
+    state: {
       adapterId: 'docker-pytest',
-      configuration: {
-        imageRegistry: '',
-        imageName: '',
-        imageVersion: 'latest'
-      },
-      state: {
-        adapterId: 'docker-pytest',
-        states: []
-      },
-      operations: [],
-      testsCount: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    })
+      validationChecks: [],
+      states: []
+    },
+    operations: [],
+    testsCount: 0,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   })
+})
 
 const isSaving = ref(false)
 
@@ -52,7 +53,7 @@ async function onSubmit(payload: {
     })
 
     toast.add({ title: 'Saved', description: 'Test pack updated.', color: 'success' })
-    await refresh()
+    await navigateTo(`/test-packs/${testPackId}/read`)
   } catch {
     toast.add({
       title: 'Save failed',
@@ -63,23 +64,24 @@ async function onSubmit(payload: {
     isSaving.value = false
   }
 }
-
-async function saveChanges() {
-  const form = document.getElementById('test-packs-edit-form') as HTMLFormElement | null
-  form?.requestSubmit()
-}
 </script>
 
 <template>
-
   <UDashboardPanel id="test-pack-edit">
     <template #header>
-      <UDashboardNavbar :title="testPack.name || 'Test Pack'" :ui="{ right: 'gap-2' }">
+      <UDashboardNavbar :title="`Edit Test Pack: ${testPack.name}`" :ui="{ right: 'gap-2' }">
         <template #leading>
           <UDashboardSidebarCollapse />
         </template>
 
         <template #right>
+          <UButton
+            icon="i-lucide-eye"
+            label="Read"
+            color="neutral"
+            variant="outline"
+            :to="`/test-packs/${testPackId}/read`"
+          />
           <UButton
             icon="i-lucide-arrow-left"
             label="Back"
@@ -87,29 +89,22 @@ async function saveChanges() {
             variant="ghost"
             to="/test-packs"
           />
-          <UButton
-            icon="i-lucide-save"
-            label="Save"
-            color="primary"
-            :loading="isSaving"
-            @click="saveChanges"
-          />
         </template>
       </UDashboardNavbar>
-
     </template>
 
     <template #body>
       <div v-if="status === 'pending'" class="text-sm text-muted">Loading test pack...</div>
 
-      <TestPacksForm
-        v-else
-        form-id="test-pack-edit-form"
-        :value="formValue"
-        :loading="isSaving"
-        submit-label="Save changes"
-        @submit="onSubmit"
-      />
+      <div v-else class="flex flex-col gap-4 sm:gap-6 lg:gap-12 w-full lg:max-w-2xl mx-auto">
+        <TestPacksForm
+          form-id="test-pack-edit-form"
+          :value="formValue"
+          :loading="isSaving"
+          submit-label="Save"
+          @submit="onSubmit"
+        />
+      </div>
     </template>
   </UDashboardPanel>
 </template>
