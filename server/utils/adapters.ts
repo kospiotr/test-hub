@@ -7,8 +7,8 @@ import {
   type AdapterStateValue
 } from './adapters/core'
 import { DockerPytestAdapter } from './adapters/dockerPytestAdapter'
-import {LocalPytestAdapter} from "#server/utils/adapters/localPytestAdapter";
-import {ShellPytestAdapter} from "#server/utils/adapters/testAdapter";
+import { LocalPytestAdapter } from './adapters/localPytestAdapter'
+import { ShellPytestAdapter } from './adapters/testAdapter'
 
 const ADAPTER_INSTANCES: AdapterInstance<Record<string, unknown>>[] = [
   new DockerPytestAdapter() as AdapterInstance<Record<string, unknown>>,

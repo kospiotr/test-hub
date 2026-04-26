@@ -25,7 +25,6 @@ export const jobs = sqliteTable('jobs', {
   type: text('type').notNull(),
   status: text('status').notNull(),
   payload: text('payload').notNull(),
-  logs: text('logs'),
   output: text('output'),
   error: text('error'),
   attempts: integer('attempts').notNull().default(0),

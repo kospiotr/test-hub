@@ -6,6 +6,7 @@ import TestListTable from '~/components/tests/TestListTable.vue'
 import JobsTable from '~/components/jobs/JobsTable.vue'
 
 const route = useRoute()
+const router = useRouter()
 const toast = useToast()
 
 const idSchema = z.coerce.number().int().positive()
@@ -14,11 +15,40 @@ const testPackId = idSchema.parse(route.params.id)
 const activeTab = ref<'summary' | 'operations' | 'tests'>('summary')
 const selectedOperationId = ref<string | 'all'>('all')
 
+function parseTabHash(hash: string) {
+  const value = hash.replace(/^#/, '')
+  if (value === 'summary' || value === 'operations' || value === 'tests') {
+    return value
+  }
+
+  return null
+}
+
 watch(() => route.query.tab, (tab) => {
   if (tab === 'summary' || tab === 'operations' || tab === 'tests') {
     activeTab.value = tab
   }
 }, { immediate: true })
+
+watch(() => route.hash, (hash) => {
+  const tab = parseTabHash(hash)
+  if (tab) {
+    activeTab.value = tab
+  }
+}, { immediate: true })
+
+watch(activeTab, async (tab) => {
+  const nextHash = `#${tab}`
+  if (route.hash === nextHash) {
+    return
+  }
+
+  await router.push({
+    path: route.path,
+    query: route.query,
+    hash: nextHash
+  })
+})
 
 watch(() => route.query.operationId, (operationId) => {
   if (typeof operationId === 'string' && operationId.trim()) {
@@ -156,8 +186,8 @@ async function runOperation(operationId: string, operationLabel: string) {
             :to="`/test-packs/${testPackId}/edit`"
           />
           <UButton
-            icon="i-lucide-arrow-left"
-            label="Back"
+            icon="i-lucide-flask-conical"
+            label="Test Packs"
             color="neutral"
             variant="ghost"
             to="/test-packs"

@@ -83,8 +83,8 @@ async function onSubmit(payload: {
             :to="`/test-packs/${testPackId}/read`"
           />
           <UButton
-            icon="i-lucide-arrow-left"
-            label="Back"
+            icon="i-lucide-flask-conical"
+            label="Test Packs"
             color="neutral"
             variant="ghost"
             to="/test-packs"

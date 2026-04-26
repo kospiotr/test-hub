@@ -114,7 +114,6 @@ export interface Job {
   type: string
   status: JobStatus
   payload: string
-  logs?: string
   output?: string
   error?: string
   attempts: number
@@ -127,6 +126,8 @@ export interface Job {
 export interface TestEntity {
   id: number
   testPackId: number
+  testPackName: string
+  testPackLabels: string[]
   imageVersion: string
   nodeId: string
   name: string

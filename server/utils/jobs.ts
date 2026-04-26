@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { db } from './db'
 import { jobs } from '../db/schema'
 import { runAdapterOperationFromJob } from './adapters'
+import { appendJobLogLine, ensureJobsLogDir, getJobLogFilePath, resolveJobsLogDir } from './job-logs'
 
 export type JobType = 'adapter-operation'
 export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled'
@@ -17,16 +18,6 @@ const adapterOperationPayloadSchema = z.object({
   operationId: z.string().trim().min(1).max(120)
 })
 
-const MAX_LOG_LENGTH = 100_000
-
-function trimLogs(logs: string) {
-  if (logs.length <= MAX_LOG_LENGTH) {
-    return logs
-  }
-
-  return logs.slice(logs.length - MAX_LOG_LENGTH)
-}
-
 function formatLogEntry(message: string) {
   return `[${new Date().toISOString()}] ${message}`
 }
@@ -40,20 +31,7 @@ function parsePayload(payload: string): AdapterOperationPayload {
 }
 
 async function appendJobLog(jobId: number, message: string) {
-  const job = await db.query.jobs.findFirst({ where: eq(jobs.id, jobId) })
-
-  if (!job) {
-    return
-  }
-
-  const nextLogs = trimLogs(`${job.logs || ''}${formatLogEntry(message)}\n`)
-
-  await db.update(jobs)
-    .set({
-      logs: nextLogs,
-      updatedAt: new Date()
-    })
-    .where(eq(jobs.id, jobId))
+  await appendJobLogLine(jobId, formatLogEntry(message))
 }
 
 async function logJob(jobId: number, message: string) {
@@ -83,13 +61,13 @@ async function failJob(jobId: number, message: string, output?: string) {
 
 export async function createJob(type: JobType, payload: AdapterOperationPayload) {
   const now = new Date()
-  const createdLog = `${formatLogEntry(`Job created with type=${type}`)}\n`
+
+  await ensureJobsLogDir()
 
   const [created] = await db.insert(jobs).values({
     type,
     status: 'queued',
     payload: JSON.stringify(payload),
-    logs: createdLog,
     attempts: 0,
     createdAt: now,
     updatedAt: now
@@ -98,6 +76,14 @@ export async function createJob(type: JobType, payload: AdapterOperationPayload)
   if (!created) {
     throw createError({ statusCode: 500, statusMessage: 'Failed to create job.' })
   }
+
+  await appendJobLog(created.id, `Job created with type=${type}`)
+  await appendJobLog(created.id, `Execution context cwd=${process.cwd()}`)
+  await appendJobLog(created.id, `Execution context pid=${process.pid}`)
+  await appendJobLog(created.id, `Execution context node=${process.version}`)
+  await appendJobLog(created.id, `Execution context jobsLogDir=${resolveJobsLogDir()}`)
+  await appendJobLog(created.id, `Execution context jobLogFile=${getJobLogFilePath(created.id)}`)
+  await appendJobLog(created.id, `Execution context payload=${JSON.stringify(payload)}`)
 
   console.info(`[jobs][${created.id}] queued (${type})`)
   return created

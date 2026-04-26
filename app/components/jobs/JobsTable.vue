@@ -1,18 +1,16 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
 import { getPaginationRowModel } from '@tanstack/table-core'
+import type { Row } from '@tanstack/table-core'
 import type { Job } from '~/types'
 
-const props = defineProps<{
+defineProps<{
   jobs: Job[]
   loading?: boolean
 }>()
 
 const table = useTemplateRef('table')
 const UBadge = resolveComponent('UBadge')
-
-const selectedJob = ref<Job | null>(null)
-const detailsOpen = ref(false)
 
 const columns: TableColumn<Job>[] = [{
   accessorKey: 'id',
@@ -42,19 +40,6 @@ const columns: TableColumn<Job>[] = [{
   accessorKey: 'updatedAt',
   header: 'Updated',
   cell: ({ row }) => new Date(row.original.updatedAt).toLocaleString()
-}, {
-  id: 'details',
-  header: 'Details',
-  cell: ({ row }) => h(resolveComponent('UButton'), {
-    label: 'View',
-    icon: 'i-lucide-file-text',
-    size: 'xs',
-    variant: 'outline',
-    onClick: () => {
-      selectedJob.value = row.original
-      detailsOpen.value = true
-    }
-  })
 }]
 
 const pagination = ref({
@@ -62,42 +47,14 @@ const pagination = ref({
   pageSize: 10
 })
 
-const prettyPayload = computed(() => {
-  const raw = selectedJob.value?.payload
-  if (!raw) {
-    return ''
-  }
-
-  try {
-    return JSON.stringify(JSON.parse(raw), null, 2)
-  } catch {
-    return raw
-  }
-})
-
-const prettyOutput = computed(() => {
-  const raw = selectedJob.value?.output
-  if (!raw) {
-    return ''
-  }
-
-  try {
-    return JSON.stringify(JSON.parse(raw), null, 2)
-  } catch {
-    return raw
-  }
-})
-
-watch(() => props.jobs, (rows) => {
-  if (!selectedJob.value) {
+function onRowSelect(event: Event, row: Row<Job>) {
+  const target = event?.target as HTMLElement | null
+  if (target?.closest('button, a, input, [role="menuitem"], [role="checkbox"]')) {
     return
   }
 
-  selectedJob.value = rows.find(item => item.id === selectedJob.value?.id) || null
-  if (!selectedJob.value) {
-    detailsOpen.value = false
-  }
-})
+  void navigateTo(`/jobs/${row.original.id}`)
+}
 </script>
 
 <template>
@@ -109,6 +66,7 @@ watch(() => props.jobs, (rows) => {
       :columns="columns"
       :data="jobs"
       :loading="loading"
+      @select="onRowSelect"
       :ui="{
         base: 'table-fixed border-separate border-spacing-0',
         thead: '[&>tr]:bg-elevated/50 [&>tr]:after:content-none',
@@ -118,34 +76,5 @@ watch(() => props.jobs, (rows) => {
         separator: 'h-0'
       }"
     />
-
-    <UModal v-model:open="detailsOpen" title="Job details" :description="selectedJob ? `Job #${selectedJob.id}` : undefined" :ui="{ content: 'sm:max-w-4xl' }">
-      <template #body>
-        <div v-if="selectedJob" class="space-y-4">
-          <div class="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-            <div><span class="font-medium">Type:</span> {{ selectedJob.type }}</div>
-            <div><span class="font-medium">Status:</span> {{ selectedJob.status }}</div>
-            <div><span class="font-medium">Attempts:</span> {{ selectedJob.attempts }}</div>
-            <div><span class="font-medium">Updated:</span> {{ new Date(selectedJob.updatedAt).toLocaleString() }}</div>
-          </div>
-
-          <UFormField label="Payload" class="w-full">
-            <UTextarea :model-value="prettyPayload" :rows="8" autoresize readonly class="w-full font-mono text-xs" :ui="{ base: 'w-full' }" />
-          </UFormField>
-
-          <UFormField label="Logs" class="w-full">
-            <UTextarea :model-value="selectedJob.logs || 'No logs yet.'" :rows="14" autoresize readonly class="w-full font-mono text-xs" :ui="{ base: 'w-full' }" />
-          </UFormField>
-
-          <UFormField label="Output" class="w-full">
-            <UTextarea :model-value="prettyOutput || 'No output yet.'" :rows="10" autoresize readonly class="w-full font-mono text-xs" :ui="{ base: 'w-full' }" />
-          </UFormField>
-
-          <UFormField label="Error" class="w-full">
-            <UTextarea :model-value="selectedJob.error || 'No error.'" :rows="4" autoresize readonly class="w-full font-mono text-xs" :ui="{ base: 'w-full' }" />
-          </UFormField>
-        </div>
-      </template>
-    </UModal>
   </div>
 </template>

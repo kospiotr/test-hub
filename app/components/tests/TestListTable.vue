@@ -15,16 +15,30 @@ const columns: TableColumn<TestEntity>[] = [{
   accessorKey: 'name',
   header: 'Name'
 }, {
-  accessorKey: 'path',
-  header: 'Path',
-  cell: ({ row }) => h('span', { class: 'font-mono text-xs' }, row.original.path)
+  accessorKey: 'testPackName',
+  header: 'Test Pack'
 }, {
-  accessorKey: 'nodeId',
-  header: 'Node ID',
-  cell: ({ row }) => h('span', { class: 'font-mono text-xs break-all' }, row.original.nodeId)
+  accessorKey: 'testPackLabels',
+  header: 'Labels',
+  cell: ({ row }) => {
+    const labels = row.original.testPackLabels || []
+    if (!labels.length) {
+      return '-'
+    }
+
+    return h('div', { class: 'flex flex-wrap gap-1' }, labels.map(label =>
+      h(resolveComponent('UBadge'), { variant: 'subtle', color: 'neutral' }, () => label)
+    ))
+  }
 }, {
-  accessorKey: 'imageVersion',
-  header: 'Image Version'
+  id: 'run',
+  header: 'Run',
+  cell: () => h(resolveComponent('UButton'), {
+    label: 'Run',
+    icon: 'i-lucide-play',
+    color: 'success',
+    size: 'xs'
+  })
 }]
 
 const pagination = ref({ pageIndex: 0, pageSize: 10 })

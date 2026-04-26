@@ -8,7 +8,6 @@ import {
   AdapterInstance,
   type AdapterOperationDefinition,
   type AdapterStateSupplier,
-  type AdapterJobOperationContext,
   type AdapterValidationCheckResult,
   type AdapterValidationContext
 } from './core'
@@ -94,99 +93,86 @@ export class DockerPytestAdapter extends AdapterInstance<DockerPytestConfig> {
           jobId: job.id,
           message: `Queued load-tests as job #${job.id}`
         }
+      },
+      runInJob: async ({testPackId, appendLog}) => {
+        if (!testPackId) {
+          throw new Error('testPackId is required for load-tests job operation.')
+        }
+
+        const resolved = await this.resolveContext(testPackId)
+        const imageRef = this.imageRef(resolved.config)
+        const existsLocally = await hasLocalImage(imageRef)
+        await appendLog(`Resolved docker image ${imageRef}.`)
+
+        if (!existsLocally) {
+          await appendLog(`Image missing locally, pulling ${imageRef}.`)
+          await pullDockerImage(imageRef)
+          await appendLog(`Image pull completed for ${imageRef}.`)
+        } else {
+          await appendLog(`Image already available locally.`)
+        }
+
+        await appendLog('Running pytest collect command in container.')
+        const result = await runImageCommand(imageRef, ['pytest', '--collect-only'])
+        const stdoutTail = tailText(result.stdout)
+        const stderrTail = tailText(result.stderr)
+        await appendLog(`imageCommand stdout tail:\n${stdoutTail || '<empty>'}`)
+        await appendLog(`imageCommand stderr tail:\n${stderrTail || '<empty>'}`)
+
+        const lines = result.stdout.split('\n').map(line => line.trim()).filter(Boolean)
+        const discovered = lines
+          .filter(line => line.includes('::') && !line.startsWith('<'))
+          .map((nodeId) => {
+            const parts = nodeId.split('::')
+            const filePath = parts[0] || ''
+            const name = parts[parts.length - 1] || nodeId
+            const suite = parts.length > 2 ? parts.slice(1, -1).join('::') : undefined
+
+            return {
+              nodeId,
+              name,
+              path: filePath,
+              suite
+            }
+          })
+
+        await db.delete(tests).where(eq(tests.testPackId, resolved.testPack.id))
+        await appendLog(`Cleared existing tests for testPackId=${resolved.testPack.id}.`)
+
+        const now = new Date()
+
+        if (discovered.length) {
+          await db.insert(tests).values(discovered.map(item => ({
+            testPackId: resolved.testPack.id,
+            imageVersion: resolved.config.imageVersion,
+            nodeId: item.nodeId,
+            name: item.name,
+            path: item.path,
+            suite: item.suite,
+            createdAt: now,
+            updatedAt: now
+          })))
+        }
+
+        await appendLog(`Inserted discovered tests count=${discovered.length}.`)
+
+        await db.update(testPacks)
+          .set({ updatedAt: now })
+          .where(eq(testPacks.id, resolved.testPack.id))
+
+        return {
+          imageRef,
+          imageVersion: resolved.config.imageVersion,
+          discoveredCount: discovered.length,
+          stderr: result.stderr
+        }
+
       }
     }
   ]
 
   readonly states: AdapterStateSupplier[] = [
   ]
-
-  async runLoadTests(testPackId: number, appendLog: (message: string) => Promise<void>) {
-    const resolved = await this.resolveContext(testPackId)
-    const imageRef = this.imageRef(resolved.config)
-    const existsLocally = await hasLocalImage(imageRef)
-    await appendLog(`Resolved docker image ${imageRef}.`)
-
-    if (!existsLocally) {
-      await appendLog(`Image missing locally, pulling ${imageRef}.`)
-      await pullDockerImage(imageRef)
-      await appendLog(`Image pull completed for ${imageRef}.`)
-    } else {
-      await appendLog(`Image already available locally.`)
-    }
-
-    await appendLog('Running pytest collect command in container.')
-    const result = await runImageCommand(imageRef, ['pytest', '--collect-only'])
-    const stdoutTail = tailText(result.stdout)
-    const stderrTail = tailText(result.stderr)
-    await appendLog(`imageCommand stdout tail:\n${stdoutTail || '<empty>'}`)
-    await appendLog(`imageCommand stderr tail:\n${stderrTail || '<empty>'}`)
-
-    const lines = result.stdout.split('\n').map(line => line.trim()).filter(Boolean)
-    const discovered = lines
-      .filter(line => line.includes('::') && !line.startsWith('<'))
-      .map((nodeId) => {
-        const parts = nodeId.split('::')
-        const filePath = parts[0] || ''
-        const name = parts[parts.length - 1] || nodeId
-        const suite = parts.length > 2 ? parts.slice(1, -1).join('::') : undefined
-
-        return {
-          nodeId,
-          name,
-          path: filePath,
-          suite
-        }
-      })
-
-    await db.delete(tests).where(eq(tests.testPackId, resolved.testPack.id))
-    await appendLog(`Cleared existing tests for testPackId=${resolved.testPack.id}.`)
-
-    const now = new Date()
-
-    if (discovered.length) {
-      await db.insert(tests).values(discovered.map(item => ({
-        testPackId: resolved.testPack.id,
-        imageVersion: resolved.config.imageVersion,
-        nodeId: item.nodeId,
-        name: item.name,
-        path: item.path,
-        suite: item.suite,
-        createdAt: now,
-        updatedAt: now
-      })))
-    }
-
-    await appendLog(`Inserted discovered tests count=${discovered.length}.`)
-
-    await db.update(testPacks)
-      .set({ updatedAt: now })
-      .where(eq(testPacks.id, resolved.testPack.id))
-
-    return {
-      imageRef,
-      imageVersion: resolved.config.imageVersion,
-      discoveredCount: discovered.length,
-      stderr: result.stderr
-    }
-  }
-
-  private async runLoadTestsInJob(context: AdapterJobOperationContext) {
-    if (!context.testPackId) {
-      throw new Error('testPackId is required for load-tests job operation.')
-    }
-
-    return await this.runLoadTests(context.testPackId, context.appendLog)
-  }
-
-  constructor() {
-    super()
-
-    const loadTestsOp = this.operations.find(op => op.id === 'load-tests')
-    if (loadTestsOp) {
-      loadTestsOp.runInJob = async (context) => await this.runLoadTestsInJob(context)
-    }
-  }
 
   async runValidationChecks(context: AdapterValidationContext): Promise<AdapterValidationCheckResult[]> {
     const resolved = await this.resolveContext(context.testPackId)

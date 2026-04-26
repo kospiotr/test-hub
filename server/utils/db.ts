@@ -33,7 +33,6 @@ sqlite.exec(`
     type TEXT NOT NULL,
     status TEXT NOT NULL,
     payload TEXT NOT NULL,
-    logs TEXT,
     output TEXT,
     error TEXT,
     attempts INTEGER NOT NULL DEFAULT 0,
@@ -78,11 +77,6 @@ sqlite.exec(`
 const testPackColumns = sqlite.prepare('PRAGMA table_info(test_packs)').all() as Array<{ name: string }>
 if (!testPackColumns.some(column => column.name === 'adapter_id')) {
   sqlite.exec('ALTER TABLE test_packs ADD COLUMN adapter_id TEXT NOT NULL DEFAULT "docker-pytest"')
-}
-
-const jobsColumns = sqlite.prepare('PRAGMA table_info(jobs)').all() as Array<{ name: string }>
-if (!jobsColumns.some(column => column.name === 'logs')) {
-  sqlite.exec('ALTER TABLE jobs ADD COLUMN logs TEXT')
 }
 
 const testsColumns = sqlite.prepare('PRAGMA table_info(tests)').all() as Array<{ name: string }>

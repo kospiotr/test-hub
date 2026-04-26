@@ -8,7 +8,6 @@ import {
   AdapterInstance,
   type AdapterOperationDefinition,
   type AdapterStateSupplier,
-  type AdapterJobOperationContext,
   type AdapterValidationCheckResult,
   type AdapterValidationContext
 } from './core'
@@ -58,6 +57,13 @@ export class LocalPytestAdapter extends AdapterInstance<LocalPytestConfig> {
           jobId: job.id,
           message: `Queued local load-tests as job #${job.id}`
         }
+      },
+      runInJob: async (context) => {
+        if (!context.testPackId) {
+          throw new Error('testPackId is required for load-tests job operation.')
+        }
+
+        return await this.runLoadTests(context.testPackId, context.appendLog)
       }
     }
   ]
@@ -130,23 +136,6 @@ export class LocalPytestAdapter extends AdapterInstance<LocalPytestConfig> {
       pythonPath,
       discoveredCount: discovered.length,
       stderr: result.stderr
-    }
-  }
-
-  private async runLoadTestsInJob(context: AdapterJobOperationContext) {
-    if (!context.testPackId) {
-      throw new Error('testPackId is required for load-tests job operation.')
-    }
-
-    return await this.runLoadTests(context.testPackId, context.appendLog)
-  }
-
-  constructor() {
-    super()
-
-    const loadTestsOp = this.operations.find(op => op.id === 'load-tests')
-    if (loadTestsOp) {
-      loadTestsOp.runInJob = async (context) => await this.runLoadTestsInJob(context)
     }
   }
 
