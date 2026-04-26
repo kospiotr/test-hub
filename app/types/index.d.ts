@@ -126,6 +126,8 @@ export interface Job {
 export interface TestEntity {
   id: number
   testPackId: number
+  isDeleted?: boolean
+  deletedAt?: string
   testPackName: string
   testPackLabels: string[]
   imageVersion: string
@@ -133,6 +135,12 @@ export interface TestEntity {
   name: string
   path: string
   suite?: string
+  operations?: Array<{
+    id: string
+    label: string
+    description: string
+    scope: 'test-pack' | 'test'
+  }>
   createdAt: string
   updatedAt: string
 }

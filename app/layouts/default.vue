@@ -35,6 +35,13 @@ const links = [[{
   onSelect: () => {
     open.value = false
   }
+}, {
+  label: 'Test Executions',
+  icon: 'i-lucide-list-video',
+  to: '/test-executions',
+  onSelect: () => {
+    open.value = false
+  }
 }], [{
   label: 'Documentation',
   icon: 'i-lucide-book-open',

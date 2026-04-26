@@ -31,7 +31,8 @@ export interface AdapterOperationContext {
   scope: AdapterOperationScope
   testPackId?: number
   testId?: number
-  enqueue: (payload: { testPackId: number, operationId: string }) => Promise<{ id: number }>
+  testIds?: number[]
+  enqueue: (payload: { testPackId: number, operationId: string, testIds?: number[] }) => Promise<{ id: number }>
   appendLog: (message: string) => Promise<void>
 }
 
@@ -39,6 +40,8 @@ export interface AdapterJobOperationContext {
   scope: AdapterOperationScope
   testPackId?: number
   testId?: number
+  testIds?: number[]
+  jobId?: number
   appendLog: (message: string) => Promise<void>
 }
 

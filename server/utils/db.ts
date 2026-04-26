@@ -47,6 +47,8 @@ sqlite.exec(`
   CREATE TABLE IF NOT EXISTS tests (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     test_pack_id INTEGER NOT NULL,
+    is_deleted INTEGER NOT NULL DEFAULT 0,
+    deleted_at INTEGER,
     image_version TEXT NOT NULL,
     node_id TEXT NOT NULL,
     name TEXT NOT NULL,
@@ -80,6 +82,14 @@ if (!testPackColumns.some(column => column.name === 'adapter_id')) {
 }
 
 const testsColumns = sqlite.prepare('PRAGMA table_info(tests)').all() as Array<{ name: string }>
+if (!testsColumns.some(column => column.name === 'is_deleted')) {
+  sqlite.exec('ALTER TABLE tests ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0')
+}
+
+if (!testsColumns.some(column => column.name === 'deleted_at')) {
+  sqlite.exec('ALTER TABLE tests ADD COLUMN deleted_at INTEGER')
+}
+
 const hasLegacyTestsLayout = testsColumns.some(column => column.name === 'test_pack_image_id')
 if (hasLegacyTestsLayout) {
   sqlite.exec('DROP TABLE IF EXISTS test_executions')
@@ -88,6 +98,8 @@ if (hasLegacyTestsLayout) {
     CREATE TABLE tests (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       test_pack_id INTEGER NOT NULL,
+      is_deleted INTEGER NOT NULL DEFAULT 0,
+      deleted_at INTEGER,
       image_version TEXT NOT NULL,
       node_id TEXT NOT NULL,
       name TEXT NOT NULL,

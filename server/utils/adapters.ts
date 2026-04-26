@@ -82,7 +82,7 @@ export async function resolveTestPackState(testPackId: number) {
 export async function executeTestPackOperation(
   testPackId: number,
   operationId: string,
-  enqueue: (payload: { testPackId: number, operationId: string }) => Promise<{ id: number }>,
+  enqueue: (payload: { testPackId: number, operationId: string, testIds?: number[] }) => Promise<{ id: number }>,
   appendLog: (message: string) => Promise<void> = async () => {}
 ) {
   const { adapter } = await resolveAdapterForTestPack(testPackId)
@@ -104,9 +104,38 @@ export async function executeTestPackOperation(
   })
 }
 
-export async function runAdapterOperationFromJob(
+export async function executeTestScopeOperation(
   testPackId: number,
   operationId: string,
+  testIds: number[],
+  enqueue: (payload: { testPackId: number, operationId: string, testIds?: number[] }) => Promise<{ id: number }>,
+  appendLog: (message: string) => Promise<void> = async () => {}
+) {
+  const { adapter } = await resolveAdapterForTestPack(testPackId)
+  const operation = adapter.getOperationById(operationId)
+
+  if (!operation) {
+    throw createError({ statusCode: 400, statusMessage: `Unsupported operation: ${operationId}` })
+  }
+
+  if (operation.scope !== 'test') {
+    throw createError({ statusCode: 400, statusMessage: `Unsupported scope for operation: ${operationId}` })
+  }
+
+  return await operation.run({
+    scope: 'test',
+    testPackId,
+    testIds,
+    enqueue,
+    appendLog
+  })
+}
+
+export async function runAdapterOperationFromJob(
+  jobId: number,
+  testPackId: number,
+  operationId: string,
+  testIds: number[] | undefined,
   appendLog: (message: string) => Promise<void>
 ) {
   const { adapter } = await resolveAdapterForTestPack(testPackId)
@@ -122,7 +151,9 @@ export async function runAdapterOperationFromJob(
 
   return await operation.runInJob({
     scope: operation.scope,
+    jobId,
     testPackId,
+    testIds,
     appendLog
   })
 }

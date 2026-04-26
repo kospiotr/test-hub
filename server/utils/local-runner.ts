@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import { promisify } from 'node:util'
 
 const execFileAsync = promisify(execFile)
@@ -43,5 +44,77 @@ export async function runLocalProjectCommand(projectPath: string, command: strin
     ].filter(Boolean).join(' ')
 
     throw new Error(message)
+  }
+}
+
+export async function runLocalProjectCommandStream(
+  projectPath: string,
+  command: string[],
+  onStdoutLine: (line: string) => Promise<void>,
+  onStderrLine: (line: string) => Promise<void>
+) {
+  if (!command.length) {
+    throw new Error('Command is empty.')
+  }
+
+  const [binary, ...args] = command
+  if (!binary) {
+    throw new Error('Command binary is missing.')
+  }
+
+  return await new Promise<{ exitCode: number | null }>((resolve, reject) => {
+    const child = spawn(binary, args, {
+      cwd: projectPath,
+      stdio: ['ignore', 'pipe', 'pipe']
+    })
+
+    const pushStdout = createLineStream(onStdoutLine)
+    const pushStderr = createLineStream(onStderrLine)
+
+    child.stdout.on('data', (chunk: Buffer) => {
+      void pushStdout(chunk.toString('utf8'))
+    })
+
+    child.stderr.on('data', (chunk: Buffer) => {
+      void pushStderr(chunk.toString('utf8'))
+    })
+
+    child.on('error', (error) => {
+      reject(error)
+    })
+
+    child.on('close', (exitCode) => {
+      void pushStdout('', true)
+      void pushStderr('', true)
+
+      if (typeof exitCode === 'number' && exitCode !== 0) {
+        reject(new Error(`Local command failed with exit code ${exitCode}.`))
+        return
+      }
+
+      resolve({ exitCode })
+    })
+  })
+}
+
+function createLineStream(onLine: (line: string) => Promise<void>) {
+  let pending = ''
+
+  return async (chunk: string, flush = false) => {
+    pending += chunk
+    const lines = pending.split(/\r?\n/)
+    pending = lines.pop() || ''
+
+    for (const line of lines) {
+      if (!line.trim()) {
+        continue
+      }
+      await onLine(line)
+    }
+
+    if (flush && pending.trim()) {
+      await onLine(pending)
+      pending = ''
+    }
   }
 }

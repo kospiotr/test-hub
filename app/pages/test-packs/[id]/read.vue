@@ -4,6 +4,7 @@ import type { TabsItem } from '@nuxt/ui'
 import type { Job, TestEntity, TestPack } from '~/types'
 import TestListTable from '~/components/tests/TestListTable.vue'
 import JobsTable from '~/components/jobs/JobsTable.vue'
+import TestListTableWithFilters from "~/components/tests/TestListTableWithFilters.vue";
 
 const route = useRoute()
 const router = useRouter()
@@ -129,6 +130,7 @@ const { data: jobs, status: jobsStatus, refresh: refreshJobs } = await useFetch<
 const { data: tests, status: testsStatus, refresh: refreshTests } = await useFetch<TestEntity[]>(`/api/tests?testPackId=${testPackId}`, {
   default: () => []
 })
+
 
 const selectedOperationModel = computed<string>({
   get: () => selectedOperationId.value,
@@ -285,12 +287,7 @@ async function runOperation(operationId: string, operationLabel: string) {
         </div>
 
         <div v-if="activeTab === 'tests'" class="space-y-3">
-          <div class="flex items-center justify-between gap-2">
-            <h3 class="font-semibold text-highlighted">Associated Tests</h3>
-            <UButton label="Refresh" icon="i-lucide-refresh-cw" variant="outline" @click="refreshAssociatedTests" />
-          </div>
-
-          <TestListTable :tests="tests" :loading="testsStatus === 'pending'" />
+          <TestListTableWithFilters ref="tableWithFilters" :selected-test-pack-ids="[testPackId]"/>
         </div>
       </div>
     </template>

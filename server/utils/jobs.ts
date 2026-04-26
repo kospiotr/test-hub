@@ -11,11 +11,13 @@ export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancell
 type AdapterOperationPayload = {
   testPackId: number
   operationId: string
+  testIds?: number[]
 }
 
 const adapterOperationPayloadSchema = z.object({
   testPackId: z.coerce.number().int().positive(),
-  operationId: z.string().trim().min(1).max(120)
+  operationId: z.string().trim().min(1).max(120),
+  testIds: z.array(z.coerce.number().int().positive()).min(1).optional()
 })
 
 function formatLogEntry(message: string) {
@@ -117,11 +119,13 @@ async function claimNextJob() {
 }
 
 async function processAdapterOperationJob(jobId: number, payload: AdapterOperationPayload) {
-  await logJob(jobId, `Processing operation=${payload.operationId} for testPackId=${payload.testPackId}.`)
+  await logJob(jobId, `Processing operation=${payload.operationId} for testPackId=${payload.testPackId} testIds=${payload.testIds?.join(',') || '-'}.`)
 
   const result = await runAdapterOperationFromJob(
+    jobId,
     payload.testPackId,
     payload.operationId,
+    payload.testIds,
     async (message) => await logJob(jobId, message)
   )
   await logJob(jobId, `Operation ${payload.operationId} succeeded.`)

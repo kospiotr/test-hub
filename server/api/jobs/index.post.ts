@@ -12,7 +12,8 @@ export default defineEventHandler(async (event) => {
 
   const normalizedPayload = z.object({
     testPackId: z.coerce.number().int().positive(),
-    operationId: z.string().trim().min(1).max(120)
+    operationId: z.string().trim().min(1).max(120),
+    testIds: z.array(z.coerce.number().int().positive()).min(1).optional()
   }).parse(payload.payload)
 
   const created = await createJob(payload.type, normalizedPayload)

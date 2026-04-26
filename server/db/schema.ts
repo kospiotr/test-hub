@@ -37,6 +37,8 @@ export const jobs = sqliteTable('jobs', {
 export const tests = sqliteTable('tests', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   testPackId: integer('test_pack_id').notNull().references(() => testPacks.id, { onDelete: 'cascade' }),
+  isDeleted: integer('is_deleted', { mode: 'boolean' }).notNull().default(false),
+  deletedAt: integer('deleted_at', { mode: 'timestamp_ms' }),
   imageVersion: text('image_version').notNull(),
   nodeId: text('node_id').notNull(),
   name: text('name').notNull(),
