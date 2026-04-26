@@ -1,0 +1,25 @@
+Metadata-Version: 2.4
+Name: pytes-example
+Version: 0.1.0
+Summary: Example Python project with pytest
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: pytest>=8.0
+
+# pytes-example
+
+Minimal Python project with `pytest` tests.
+
+## Setup
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e .
+```
+
+## Run tests
+
+```bash
+pytest -q
+```

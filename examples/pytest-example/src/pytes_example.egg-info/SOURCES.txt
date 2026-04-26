@@ -1,0 +1,10 @@
+README.md
+pyproject.toml
+src/pytes_example/__init__.py
+src/pytes_example/calculator.py
+src/pytes_example.egg-info/PKG-INFO
+src/pytes_example.egg-info/SOURCES.txt
+src/pytes_example.egg-info/dependency_links.txt
+src/pytes_example.egg-info/requires.txt
+src/pytes_example.egg-info/top_level.txt
+tests/test_calculator.py
